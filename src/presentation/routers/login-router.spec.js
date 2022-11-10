@@ -1,44 +1,27 @@
-class LoginRouter {
-  route (httpRequest) {
-    if (!httpRequest || !httpRequest.body) {
-      return HttpResponse.serverError()
-    }
+const LoginRouter = require('./login-router')
+const MissingParamError = require('../helpers/missing-param-error')
+const UnauthorizedError = require('../helpers/unauthorized-error')
 
-    const { email, password } = httpRequest.body
-    if (!email) {
-      return HttpResponse.badRequest('email')
-    }
-    if (!password) {
-      return HttpResponse.badRequest('password')
-    }
-  }
-}
-
-class HttpResponse {
-  static badRequest (paramName) {
-    return {
-      statusCode: 400,
-      body: new MissingParamError(paramName)
+const makeSut = () => {
+  class AuthUseCaseSpy {
+    auth (email, password) {
+      this.email = email
+      this.password = password
     }
   }
 
-  static serverError () {
-    return {
-      statusCode: 500
-    }
-  }
-}
+  const authUseCaseSpy = new AuthUseCaseSpy()
+  const sut = new LoginRouter(authUseCaseSpy) // dependencie injection
 
-class MissingParamError extends Error {
-  constructor (paramName) {
-    super(`Missing param: ${paramName}`)
-    this.name = 'MissParamError'
+  return {
+    sut,
+    authUseCaseSpy
   }
-}
+} // this is a design patern called factory
 
 describe('Login Router', () => {
   it('should return 400 if email is not provided', () => {
-    const sut = new LoginRouter() // sut: system under test
+    const { sut } = makeSut() // sut: system under test
 
     const httpRequest = {
       body: {
@@ -52,7 +35,7 @@ describe('Login Router', () => {
   })
 
   it('should return 400 if password is not provided', () => {
-    const sut = new LoginRouter()
+    const { sut } = makeSut()
 
     const httpRequest = {
       body: {
@@ -66,7 +49,7 @@ describe('Login Router', () => {
   })
 
   it('should return 500 if httpRequest is not provided', () => {
-    const sut = new LoginRouter()
+    const { sut } = makeSut()
 
     const httpResponse = sut.route()
 
@@ -74,9 +57,69 @@ describe('Login Router', () => {
   })
 
   it('should return 500 if httpRequest has no body', () => {
-    const sut = new LoginRouter()
+    const { sut } = makeSut()
 
     const httpRequest = {}
+    const httpResponse = sut.route(httpRequest)
+
+    expect(httpResponse.statusCode).toBe(500)
+  })
+
+  it('should call AuthUseCase with correct params', () => {
+    const { sut, authUseCaseSpy } = makeSut()
+
+    const httpRequest = {
+      body: {
+        email: 'email@email.com',
+        password: 'pass1234'
+      }
+    }
+    sut.route(httpRequest)
+
+    expect(authUseCaseSpy.email).toBe(httpRequest.body.email)
+    expect(authUseCaseSpy.password).toBe(httpRequest.body.password)
+  })
+
+  it('should return 401 when invalid credentials are provided', () => {
+    const { sut } = makeSut()
+
+    const httpRequest = {
+      body: {
+        email: 'invalid_email@email.com',
+        password: 'invalid_password'
+      }
+    }
+    const httpResponse = sut.route(httpRequest)
+
+    expect(httpResponse.statusCode).toBe(401)
+    expect(httpResponse.body).toEqual(new UnauthorizedError())
+  })
+
+  it('should return 500 if AuthUseCase is not provided', () => {
+    const sut = new LoginRouter()
+
+    const httpRequest = {
+      body: {
+        email: 'email@email.com',
+        password: 'pass1234'
+      }
+    }
+    const httpResponse = sut.route(httpRequest)
+
+    expect(httpResponse.statusCode).toBe(500)
+  })
+
+  it('should return 500 if AuthUseCase has no auth method', () => {
+    class AuthUseCaseSpy {}
+    const authUseCaseSpy = new AuthUseCaseSpy()
+    const sut = new LoginRouter(authUseCaseSpy)
+
+    const httpRequest = {
+      body: {
+        email: 'email@email.com',
+        password: 'pass1234'
+      }
+    }
     const httpResponse = sut.route(httpRequest)
 
     expect(httpResponse.statusCode).toBe(500)
