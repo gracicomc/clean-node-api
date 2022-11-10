@@ -7,10 +7,12 @@ const makeSut = () => {
     auth (email, password) {
       this.email = email
       this.password = password
+      return this.accessToken
     }
   }
 
   const authUseCaseSpy = new AuthUseCaseSpy()
+  authUseCaseSpy.accessToken = 'valid_token' // moking a valid token as default - good pratice
   const sut = new LoginRouter(authUseCaseSpy) // dependencie injection
 
   return {
@@ -25,7 +27,7 @@ describe('Login Router', () => {
 
     const httpRequest = {
       body: {
-        password: 'pass1234'
+        password: 'any_password'
       }
     }
     const httpResponse = sut.route(httpRequest)
@@ -39,7 +41,7 @@ describe('Login Router', () => {
 
     const httpRequest = {
       body: {
-        email: 'email@email.com'
+        email: 'any_email@email.com'
       }
     }
     const httpResponse = sut.route(httpRequest)
@@ -70,8 +72,8 @@ describe('Login Router', () => {
 
     const httpRequest = {
       body: {
-        email: 'email@email.com',
-        password: 'pass1234'
+        email: 'any_email@email.com',
+        password: 'any_password'
       }
     }
     sut.route(httpRequest)
@@ -80,8 +82,23 @@ describe('Login Router', () => {
     expect(authUseCaseSpy.password).toBe(httpRequest.body.password)
   })
 
-  it('should return 401 when invalid credentials are provided', () => {
+  it('should return 200 when valid credentials are provided', () => {
     const { sut } = makeSut()
+
+    const httpRequest = {
+      body: {
+        email: 'valid_email@email.com',
+        password: 'valid_password'
+      }
+    }
+    const httpResponse = sut.route(httpRequest)
+
+    expect(httpResponse.statusCode).toBe(200)
+  })
+
+  it('should return 401 when invalid credentials are provided', () => {
+    const { sut, authUseCaseSpy } = makeSut()
+    authUseCaseSpy.accessToken = null
 
     const httpRequest = {
       body: {
@@ -100,8 +117,8 @@ describe('Login Router', () => {
 
     const httpRequest = {
       body: {
-        email: 'email@email.com',
-        password: 'pass1234'
+        email: 'any_email@email.com',
+        password: 'any_password'
       }
     }
     const httpResponse = sut.route(httpRequest)
@@ -116,8 +133,8 @@ describe('Login Router', () => {
 
     const httpRequest = {
       body: {
-        email: 'email@email.com',
-        password: 'pass1234'
+        email: 'any_email@email.com',
+        password: 'any_password'
       }
     }
     const httpResponse = sut.route(httpRequest)
